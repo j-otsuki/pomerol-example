@@ -172,6 +172,7 @@ int main(int argc, char* argv[])
     // LatticePresets::addCoulombS(&L, "A", U_int, -mu);
     // Fully rotationally invariant Coulomb interactions
     LatticePresetsExtra::addCoulombF(&L, "A", Fk, l_orb, -mu);
+    // Spin-Orbit coupling
     LatticePresetsExtra::addSpinOrbit(&L, "A", l_orb, lambda_ls);
 
     // Let us now print which sites and terms are defined.
@@ -387,33 +388,12 @@ int main(int argc, char* argv[])
     // Actually compute the density matrix.
     rho.compute();
 
-    RealType DensityMatrixCutoff = 1e-15;
-    if (!world.rank()){
-        RealType sum=0;  // to be 1.0
-        int n_state_reduced=0;
-        for (QuantumState i=0; i<S.getNumberOfStates(); ++i){
-            RealType w = rho.getWeight(i);
-            if ( w > DensityMatrixCutoff ){
-                // INFO( w << "   " << S.getQuantumNumbers(S.getBlockNumber(i)) );
-                sum += w;
-                ++n_state_reduced;
-            }
-        }
-        INFO("Number of states having non-negligible weight: " << n_state_reduced);
-        INFO("Total weight of the trucated states: " << sum-1.0);
-        // fileout
-        std::ofstream fout("density_matrix.dat");
-        fout << "Number of states having non-negligible weight: " << n_state_reduced << std::endl;
-        fout << "Total weight of the trucated states: " << sum-1.0 << std::endl;
-        for (QuantumState i=0; i<S.getNumberOfStates(); ++i){
-            RealType w = rho.getWeight(i);
-            if ( w > DensityMatrixCutoff )
-                fout << w << "   " << S.getQuantumNumbers(S.getBlockNumber(i)) << std::endl;
-        }
-        fout.close();
-    }
+    /** Minimal magnitude of the weight (density matrix) to take it into account. */
+    RealType DensityMatrixCutoff = 1e-10;
 
-    rho.truncateBlocks(DensityMatrixCutoff);
+    bool verbose = world.rank()==0;
+    // Truncate blocks that have only negligible contribute to GF and TwoParticleGF
+    rho.truncateBlocks(DensityMatrixCutoff, verbose);
 
     if (!world.rank()) {
         // fileout
